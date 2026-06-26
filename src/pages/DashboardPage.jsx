@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { generateAndDownloadCsv } from '../lib/exportCsv'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { Pencil, Plus, Trash2, Download } from 'lucide-react'
+import { Pencil, Plus, Trash2, Download, SlidersHorizontal } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import EntryModal from '../components/EntryModal'
+import PersonalizeModal from '../components/PersonalizeModal'
 import {
   getCohortDay, getCohortWeek,
   getDayDateKey, getDayShort, getDayLetter, getDayFull,
@@ -46,28 +47,73 @@ function avg(values) {
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
-function Header({ profile }) {
+function Header({ profile, onPersonalize }) {
   const hasStarted = currentDay != null
   const dayName = hasStarted ? getDayFull(currentDay) : null
   const weekNum = hasStarted ? currentWeek : null
+  const hasPersonalized = !!profile?.goal
+
+  const goalLabels = {
+    muscle_building: 'Muscle Building',
+    fat_loss: 'Fat Loss',
+    maintain: 'Maintain',
+  }
 
   return (
     <div className="px-4 pt-6 pb-2">
-      <div className="flex items-center gap-3 mb-3">
-        <img src="/logo.png" alt="LFG" className="w-10 h-10 object-contain rounded-full" />
-        <div>
-          <h1 className="text-white font-bold text-xl leading-tight">
-            Welcome, {profile?.name || 'Athlete'}!
-          </h1>
-          {hasStarted ? (
-            <p className="font-mono text-xs mt-0.5" style={{ color: '#999966' }}>
-              Day {currentDay} of 14 · {dayName} · Week {weekNum}
-            </p>
-          ) : (
-            <p className="text-[#9C9C9C] text-xs mt-0.5">Challenge starts 1 July 2026</p>
-          )}
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="LFG" className="w-10 h-10 object-contain rounded-full" />
+          <div>
+            <h1 className="text-white font-bold text-xl leading-tight">
+              Welcome, {profile?.name || 'Athlete'}!
+            </h1>
+            {hasStarted ? (
+              <p className="font-mono text-xs mt-0.5" style={{ color: '#999966' }}>
+                Day {currentDay} of 14 · {dayName} · Week {weekNum}
+              </p>
+            ) : (
+              <p className="text-[#9C9C9C] text-xs mt-0.5">Challenge starts 1 July 2026</p>
+            )}
+          </div>
         </div>
+
+        {/* Personalize button */}
+        <button
+          onClick={onPersonalize}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all"
+          style={hasPersonalized
+            ? { background: 'rgba(153,153,102,0.15)', color: '#999966', border: '1px solid rgba(153,153,102,0.35)' }
+            : { background: 'rgba(255,255,255,0.07)', color: '#9C9C9C', border: '1px solid rgba(255,255,255,0.1)' }
+          }
+        >
+          <SlidersHorizontal size={13} />
+          {hasPersonalized ? goalLabels[profile.goal] : 'Personalize'}
+        </button>
       </div>
+
+      {/* Macro targets summary strip */}
+      {hasPersonalized && (
+        <div
+          className="flex items-center gap-2 flex-wrap px-1 pb-2"
+        >
+          {[
+            { label: 'Kcal', value: profile.target_kcal, color: '#f97316' },
+            { label: 'P',    value: `${profile.target_protein}g`, color: '#22d3ee' },
+            { label: 'C',    value: `${profile.target_carbs}g`,   color: '#22c55e' },
+            { label: 'F',    value: `${profile.target_fat}g`,     color: '#eab308' },
+          ].map(m => (
+            <div
+              key={m.label}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg"
+              style={{ background: `${m.color}15`, border: `1px solid ${m.color}30` }}
+            >
+              <span className="text-[10px] font-bold" style={{ color: m.color }}>{m.label}</span>
+              <span className="text-white text-[10px] font-mono font-semibold">{m.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -447,13 +493,14 @@ function ExportCard({ session, profile }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { session, profile } = useAuth()
+  const { session, profile, fetchProfile } = useAuth()
   const [gymSessions, setGymSessions]     = useState([])
   const [homeSessions, setHomeSessions]   = useState([])
   const [weightEntries, setWeightEntries] = useState([])
   const [stepEntries, setStepEntries]     = useState([])
   const [loading, setLoading]             = useState(true)
   const [modal, setModal]                 = useState(null)
+  const [showPersonalize, setShowPersonalize] = useState(false)
   // modal = { type: 'weight'|'steps', dayIndex, existingValue, entryId }
 
   const loadData = useCallback(async () => {
@@ -504,6 +551,11 @@ export default function DashboardPage() {
     await loadData()
   }
 
+  async function handleSavePersonalize(data) {
+    await supabase.from('profiles').update(data).eq('id', session.user.id)
+    await fetchProfile(session.user.id)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -514,7 +566,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-black">
-      <Header profile={profile} />
+      <Header profile={profile} onPersonalize={() => setShowPersonalize(true)} />
 
       <div className="flex flex-col gap-4 px-4 pb-8">
         <WorkoutsCard gymSessions={gymSessions} homeSessions={homeSessions} />
@@ -539,6 +591,14 @@ export default function DashboardPage() {
           existingValue={modal.existingValue}
           onSave={handleSave}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {showPersonalize && (
+        <PersonalizeModal
+          profile={profile}
+          onSave={handleSavePersonalize}
+          onClose={() => setShowPersonalize(false)}
         />
       )}
     </div>
