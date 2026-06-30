@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Sun, UtensilsCrossed, Moon, Apple, ChevronDown, ChevronUp, Info, Plus, Check } from 'lucide-react'
+import { Sun, UtensilsCrossed, Moon, Apple, ChevronDown, ChevronUp, Info, Plus, Check, Leaf } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const GLASS = 'bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl'
@@ -183,7 +183,7 @@ function MealCard({ meal, showCook, isSelected, onToggle }) {
 }
 
 // ── Section Group ──────────────────────────────────────────────────────────────
-function SectionGroup({ section, showCook, selectedMeals, onToggleMeal, hasTargets }) {
+function SectionGroup({ section, showCook, selectedMeals, onToggleMeal, hasTargets, planKey }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -198,7 +198,8 @@ function SectionGroup({ section, showCook, selectedMeals, onToggleMeal, hasTarge
 
       <div className="flex flex-col gap-2.5">
         {section.meals.map((meal, i) => {
-          const key = `${section.name}-${i}`
+          // Prefixed with planKey so default-plan and vegetarian-plan selections never collide
+          const key = `${planKey}-${section.name}-${i}`
           return (
             <MealCard
               key={i}
@@ -271,40 +272,78 @@ function DayAtAGlance({ glance }) {
   )
 }
 
+// ── Vegetarian Toggle ──────────────────────────────────────────────────────────
+function VegToggle({ isVegetarian, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!isVegetarian)}
+      className="w-full flex items-center justify-between p-3.5 rounded-2xl transition-all"
+      style={{
+        background: isVegetarian ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.05)',
+        border: isVegetarian ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)',
+      }}
+    >
+      <div className="flex items-center gap-2.5">
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: isVegetarian ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)' }}
+        >
+          <Leaf size={15} style={{ color: isVegetarian ? '#22c55e' : '#9C9C9C' }} />
+        </div>
+        <div className="text-left">
+          <p className="text-white font-semibold text-sm">Vegetarian</p>
+          <p className="text-[#9C9C9C] text-[10px] mt-0.5">Show vegetarian meal options</p>
+        </div>
+      </div>
+
+      {/* Switch */}
+      <div
+        className="w-11 h-6 rounded-full relative transition-all shrink-0"
+        style={{ background: isVegetarian ? '#22c55e' : 'rgba(255,255,255,0.15)' }}
+      >
+        <div
+          className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+          style={{ left: isVegetarian ? '22px' : '2px' }}
+        />
+      </div>
+    </button>
+  )
+}
+
 // ── Shared MealPlanPage ────────────────────────────────────────────────────────
-export default function MealPlanPage({ mealPlan, showCook = false }) {
+export default function MealPlanPage({ mealPlan, vegetarianPlan = null, showCook = false }) {
   const { profile } = useAuth()
   const hasTargets = !!profile?.goal
 
-  // selectedMeals: Set of "SectionName-index" keys
+  const [isVegetarian, setIsVegetarian] = useState(false)
+  const activePlan = isVegetarian && vegetarianPlan ? vegetarianPlan : mealPlan
+  const planKey = isVegetarian && vegetarianPlan ? 'veg' : 'default'
+
+  // selectedMeals: Set of "planKey-SectionName-index" keys — kept across toggle
+  // switches so default-plan and vegetarian-plan selections both stay counted.
   const [selectedMeals, setSelectedMeals] = useState(new Set())
-  // selectedMacros: running totals
   const [selectedMacros, setSelectedMacros] = useState({ kcal: 0, P: 0, C: 0, F: 0 })
-  // mealMacrosMap: key -> macros (so we can subtract on deselect)
-  const [mealMacrosMap] = useState({})
 
   function toggleMeal(key, macros) {
+    const isCurrentlySelected = selectedMeals.has(key)
+    const sign = isCurrentlySelected ? -1 : 1
+
+    // Each updater is now pure and independent — no setState nested inside
+    // another setState's updater — so React StrictMode's dev-mode double
+    // invocation can no longer double-apply the macro totals.
     setSelectedMeals(prev => {
       const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-        setSelectedMacros(cur => ({
-          kcal: Math.max(0, cur.kcal - (macros.kcal || 0)),
-          P:    Math.max(0, cur.P    - (macros.P    || 0)),
-          C:    Math.max(0, cur.C    - (macros.C    || 0)),
-          F:    Math.max(0, cur.F    - (macros.F    || 0)),
-        }))
-      } else {
-        next.add(key)
-        setSelectedMacros(cur => ({
-          kcal: cur.kcal + (macros.kcal || 0),
-          P:    cur.P    + (macros.P    || 0),
-          C:    cur.C    + (macros.C    || 0),
-          F:    cur.F    + (macros.F    || 0),
-        }))
-      }
+      if (isCurrentlySelected) next.delete(key)
+      else next.add(key)
       return next
     })
+
+    setSelectedMacros(cur => ({
+      kcal: Math.max(0, cur.kcal + sign * (macros.kcal || 0)),
+      P:    Math.max(0, cur.P    + sign * (macros.P    || 0)),
+      C:    Math.max(0, cur.C    + sign * (macros.C    || 0)),
+      F:    Math.max(0, cur.F    + sign * (macros.F    || 0)),
+    }))
   }
 
   return (
@@ -313,6 +352,11 @@ export default function MealPlanPage({ mealPlan, showCook = false }) {
       <p className="text-[#9C9C9C] text-xs mb-5">Pick one option per meal · mix and match</p>
 
       <div className="flex flex-col gap-5">
+        {/* Vegetarian toggle — only shown if a vegetarian plan was provided */}
+        {vegetarianPlan && (
+          <VegToggle isVegetarian={isVegetarian} onChange={setIsVegetarian} />
+        )}
+
         {/* Personalized targets — only shown if user has personalized */}
         {hasTargets && (
           <PersonalizedTargetsCard
@@ -321,16 +365,17 @@ export default function MealPlanPage({ mealPlan, showCook = false }) {
           />
         )}
 
-        <DayAtAGlance glance={mealPlan.glance} />
+        <DayAtAGlance glance={activePlan.glance} />
 
-        {mealPlan.sections.map((section, i) => (
+        {activePlan.sections.map((section, i) => (
           <SectionGroup
-            key={i}
+            key={`${planKey}-${i}`}
             section={section}
             showCook={showCook}
             selectedMeals={selectedMeals}
             onToggleMeal={toggleMeal}
             hasTargets={hasTargets}
+            planKey={planKey}
           />
         ))}
       </div>

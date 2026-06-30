@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { generateAndDownloadCsv } from '../lib/exportCsv'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { Pencil, Plus, Trash2, Download, SlidersHorizontal } from 'lucide-react'
+import { Pencil, Plus, Trash2, Download, SlidersHorizontal, LogOut } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import EntryModal from '../components/EntryModal'
 import PersonalizeModal from '../components/PersonalizeModal'
+import LogoutModal from '../components/LogoutModal'
 import {
   getCohortDay, getCohortWeek,
   getDayDateKey, getDayShort, getDayLetter, getDayFull,
@@ -47,7 +48,7 @@ function avg(values) {
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
-function Header({ profile, onPersonalize }) {
+function Header({ profile, onPersonalize, onLogout }) {
   const hasStarted = currentDay != null
   const dayName = hasStarted ? getDayFull(currentDay) : null
   const weekNum = hasStarted ? currentWeek : null
@@ -78,18 +79,29 @@ function Header({ profile, onPersonalize }) {
           </div>
         </div>
 
-        {/* Personalize button */}
-        <button
-          onClick={onPersonalize}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all"
-          style={hasPersonalized
-            ? { background: 'rgba(153,153,102,0.15)', color: '#999966', border: '1px solid rgba(153,153,102,0.35)' }
-            : { background: 'rgba(255,255,255,0.07)', color: '#9C9C9C', border: '1px solid rgba(255,255,255,0.1)' }
-          }
-        >
-          <SlidersHorizontal size={13} />
-          {hasPersonalized ? goalLabels[profile.goal] : 'Personalize'}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Personalize button */}
+          <button
+            onClick={onPersonalize}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all"
+            style={hasPersonalized
+              ? { background: 'rgba(153,153,102,0.15)', color: '#999966', border: '1px solid rgba(153,153,102,0.35)' }
+              : { background: 'rgba(255,255,255,0.07)', color: '#9C9C9C', border: '1px solid rgba(255,255,255,0.1)' }
+            }
+          >
+            <SlidersHorizontal size={13} />
+            {hasPersonalized ? goalLabels[profile.goal] : 'Personalize'}
+          </button>
+
+          {/* Logout button */}
+          <button
+            onClick={onLogout}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#9C9C9C] hover:text-red-400 transition-colors"
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <LogOut size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Macro targets summary strip */}
@@ -493,7 +505,7 @@ function ExportCard({ session, profile }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { session, profile, fetchProfile } = useAuth()
+  const { session, profile, fetchProfile, logout } = useAuth()
   const [gymSessions, setGymSessions]     = useState([])
   const [homeSessions, setHomeSessions]   = useState([])
   const [weightEntries, setWeightEntries] = useState([])
@@ -501,6 +513,7 @@ export default function DashboardPage() {
   const [loading, setLoading]             = useState(true)
   const [modal, setModal]                 = useState(null)
   const [showPersonalize, setShowPersonalize] = useState(false)
+  const [showLogout, setShowLogout] = useState(false)
   // modal = { type: 'weight'|'steps', dayIndex, existingValue, entryId }
 
   const loadData = useCallback(async () => {
@@ -566,7 +579,11 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-black">
-      <Header profile={profile} onPersonalize={() => setShowPersonalize(true)} />
+      <Header
+        profile={profile}
+        onPersonalize={() => setShowPersonalize(true)}
+        onLogout={() => setShowLogout(true)}
+      />
 
       <div className="flex flex-col gap-4 px-4 pb-8">
         <WorkoutsCard gymSessions={gymSessions} homeSessions={homeSessions} />
@@ -599,6 +616,13 @@ export default function DashboardPage() {
           profile={profile}
           onSave={handleSavePersonalize}
           onClose={() => setShowPersonalize(false)}
+        />
+      )}
+
+      {showLogout && (
+        <LogoutModal
+          onConfirm={logout}
+          onClose={() => setShowLogout(false)}
         />
       )}
     </div>

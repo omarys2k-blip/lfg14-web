@@ -90,6 +90,147 @@ export const HOME_COOKED_PLAN = {
   ],
 }
 
+export const VEGETARIAN_PLAN = {
+  title: 'Vegetarian Meals',
+  glance: {
+    sections: {
+      Breakfast: '340–510',
+      Lunch:     '520–535',
+      Dinner:    '470–490',
+      Snack:     '150–240',
+    },
+    totalKcal: '1,480–1,775',
+    macros: { P: '76–125', C: '105–214', F: '40–69' },
+  },
+  sections: [
+    {
+      name: 'Breakfast',
+      meals: [
+        {
+          option: 'Option 1',
+          name: 'Go-To Daily Breakfast',
+          macros: { kcal: 510, P: 35, C: 42, F: 16 },
+          ingredients: '3 boiled eggs · 150g Greek yogurt · 2 slices multigrain bread',
+          instructions: null,
+        },
+        {
+          option: 'Option 2',
+          name: 'Masala Egg Bhurji + Roti',
+          macros: { kcal: 405, P: 30, C: 40, F: 14 },
+          ingredients: 'Spiced scrambled eggs (masala bhurji) · 1–2 whole wheat rotis',
+          instructions: null,
+        },
+        {
+          option: 'Option 3',
+          name: 'Greek Yogurt Power Bowl',
+          macros: { kcal: 340, P: 20, C: 38, F: 12 },
+          ingredients: 'Greek yogurt · granola · mixed berries · honey',
+          instructions: null,
+        },
+        {
+          option: 'Option 4',
+          name: 'Paneer Egg Wrap',
+          macros: { kcal: 400, P: 31, C: 36, F: 15 },
+          ingredients: 'Paneer · egg · whole wheat wrap · vegetables',
+          instructions: null,
+        },
+      ],
+    },
+    {
+      name: 'Lunch',
+      meals: [
+        {
+          option: 'Option 1',
+          name: 'Paneer + Dal Protein Bowl',
+          macros: { kcal: 535, P: 43, C: 57, F: 16 },
+          ingredients: 'Paneer · dal (lentils) · rice · vegetables',
+          instructions: null,
+        },
+        {
+          option: 'Option 2',
+          name: 'Egg Fried Rice (Indian Style)',
+          macros: { kcal: 520, P: 40, C: 54, F: 15 },
+          ingredients: 'Eggs · rice · mixed vegetables · Indian spices',
+          instructions: null,
+        },
+        {
+          option: 'Option 3',
+          name: 'Rajma Rice Bowl',
+          macros: { kcal: 530, P: 28, C: 78, F: 10 },
+          ingredients: 'Rajma (kidney beans) · rice',
+          instructions: null,
+        },
+      ],
+    },
+    {
+      name: 'Dinner',
+      meals: [
+        {
+          option: 'Option 1',
+          name: 'Palak Paneer + Rice',
+          macros: { kcal: 490, P: 36, C: 40, F: 20 },
+          ingredients: 'Palak paneer (spinach + paneer curry) · rice',
+          instructions: null,
+        },
+        {
+          option: 'Option 2',
+          name: 'Masala Omelette + Sweet Potato Hash',
+          macros: { kcal: 480, P: 34, C: 42, F: 19 },
+          ingredients: 'Masala omelette · sweet potato hash',
+          instructions: null,
+        },
+        {
+          option: 'Option 3',
+          name: 'Dal Tadka + Jeera Rice',
+          macros: { kcal: 470, P: 30, C: 58, F: 14 },
+          ingredients: 'Dal tadka (tempered lentils) · jeera (cumin) rice',
+          instructions: null,
+        },
+      ],
+    },
+    {
+      name: 'Snack',
+      meals: [
+        {
+          option: 'Option 1',
+          name: 'Rice Cakes + Nut Butter',
+          macros: { kcal: 230, P: 8, C: 22, F: 12 },
+          ingredients: '2–3 rice cakes · nut butter',
+          instructions: null,
+        },
+        {
+          option: 'Option 2',
+          name: 'Greek Yogurt + Berries/Banana',
+          macros: { kcal: 160, P: 12, C: 16, F: 5 },
+          ingredients: 'Greek yogurt · berries or banana',
+          instructions: null,
+        },
+        {
+          option: 'Option 3',
+          name: 'Mixed Nuts + Fruit',
+          macros: { kcal: 240, P: 6, C: 14, F: 18 },
+          ingredients: 'Mixed nuts · 1 piece of fruit',
+          instructions: null,
+        },
+        {
+          option: 'Option 4',
+          name: 'Boiled Egg + Cucumber + Hummus',
+          macros: { kcal: 200, P: 12, C: 12, F: 11 },
+          ingredients: '1–2 boiled eggs · cucumber · hummus',
+          instructions: null,
+        },
+        {
+          option: 'Option 5',
+          name: 'Protein Shake',
+          macros: { kcal: 150, P: 25, C: 5, F: 3 },
+          ingredients: 'Vegetarian protein powder · water or milk',
+          instructions: null,
+        },
+      ],
+    },
+  ],
+}
+
 export const SPINNEYS_PLAN = {
   title: 'Spinneys Meal Plan',
   glance: {
