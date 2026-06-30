@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, X, ChevronUp, ChevronDown } from 'lucide-react
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { GYM_PLAN } from '../data/gymPlan'
+import { toLocalDateKey } from '../lib/cohortClock'
 
 const GLASS = 'bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl'
 
@@ -17,7 +18,7 @@ function calcVolume(sets) {
 }
 
 // ── Exercise Card ─────────────────────────────────────────────────────────────
-function ExerciseCard({ exercise, planEx, setLogs, inputValues, onChange, onClear, w1SetLogs, w1Inputs }) {
+function ExerciseCard({ exercise, planEx, setLogs, inputValues, onChange, onClear, onBlurFlush, w1SetLogs, w1Inputs }) {
   const sets = setLogs.sort((a, b) => a.set_number - b.set_number)
   const totalVol = calcVolume(sets.map(sl => inputValues[sl.id] || { weight: '0', reps: '0' }))
 
@@ -120,6 +121,7 @@ function ExerciseCard({ exercise, planEx, setLogs, inputValues, onChange, onClea
                   value={w || ''}
                   placeholder="0"
                   onChange={e => onChange(sl.id, 'weight', e.target.value)}
+                  onBlur={() => onBlurFlush(sl.id)}
                   className="w-full h-9 rounded-lg text-center text-white text-sm font-mono outline-none focus:ring-1 focus:ring-[#999966]"
                   style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
                 />
@@ -132,6 +134,7 @@ function ExerciseCard({ exercise, planEx, setLogs, inputValues, onChange, onClea
                   value={r || ''}
                   placeholder="0"
                   onChange={e => onChange(sl.id, 'reps', e.target.value)}
+                  onBlur={() => onBlurFlush(sl.id)}
                   className="w-full h-9 rounded-lg text-center text-white text-sm font-mono outline-none focus:ring-1 focus:ring-[#999966]"
                   style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
                 />
@@ -254,7 +257,7 @@ function ProgressReview({ w1Logs, w1Inputs, w2Logs, w2Inputs }) {
 }
 
 // ── Week Block ────────────────────────────────────────────────────────────────
-function WeekBlock({ week, session, exerciseLogs, inputValues, onChange, onClear, onStart, onToggleComplete, starting, togglingComplete, w1Logs, w1Inputs, planExercises }) {
+function WeekBlock({ week, session, exerciseLogs, inputValues, onChange, onClear, onBlurFlush, onStart, onToggleComplete, starting, togglingComplete, w1Logs, w1Inputs, planExercises }) {
   const started = !!session
   const completed = session?.completed ?? false
   const [expanded, setExpanded] = useState(true)
@@ -325,6 +328,7 @@ function WeekBlock({ week, session, exerciseLogs, inputValues, onChange, onClear
                 inputValues={inputValues}
                 onChange={onChange}
                 onClear={onClear}
+                onBlurFlush={onBlurFlush}
                 w1SetLogs={w1Ex?.set_logs || null}
                 w1Inputs={week === 2 ? w1Inputs : null}
               />
@@ -419,7 +423,7 @@ export default function GymDayPage() {
     if (!session || !plan) return
     setStarting(prev => ({ ...prev, [week]: true }))
     const uid = session.user.id
-    const today = new Date().toISOString().split('T')[0]
+    const today = toLocalDateKey(new Date())
 
     // Guard against duplicate sessions: check if one already exists for this
     // user + day + week before creating a new one (handles double-taps,
@@ -489,6 +493,14 @@ export default function GymDayPage() {
     setTogglingComplete(prev => ({ ...prev, [week]: false }))
   }
 
+  async function saveSetLog(week, setLogId) {
+    const vals = inputValuesRef.current[week][setLogId] || { weight: '0', reps: '0' }
+    await supabase
+      .from('set_logs')
+      .update({ weight_kg: parseFloat(vals.weight) || 0, reps: parseInt(vals.reps) || 0 })
+      .eq('id', setLogId)
+  }
+
   function handleChange(week, setLogId, field, rawValue) {
     const updated = {
       ...inputValuesRef.current[week],
@@ -497,15 +509,46 @@ export default function GymDayPage() {
     inputValuesRef.current = { ...inputValuesRef.current, [week]: updated }
     setInputValues(prev => ({ ...prev, [week]: updated }))
 
-    clearTimeout(debounceTimers.current[setLogId])
-    debounceTimers.current[setLogId] = setTimeout(async () => {
-      const vals = inputValuesRef.current[week][setLogId] || { weight: '0', reps: '0' }
-      await supabase
-        .from('set_logs')
-        .update({ weight_kg: parseFloat(vals.weight) || 0, reps: parseInt(vals.reps) || 0 })
-        .eq('id', setLogId)
+    clearTimeout(debounceTimers.current[setLogId]?.timerId)
+    const timerId = setTimeout(() => {
+      saveSetLog(week, setLogId)
+      debounceTimers.current[setLogId] = null
     }, 500)
+    debounceTimers.current[setLogId] = { timerId, week }
   }
+
+  // Save immediately rather than waiting for the debounce — used on blur
+  // (tapping away from a field) and when the app is backgrounded, so a
+  // value typed right before closing the app is never silently dropped.
+  function flushChange(week, setLogId) {
+    const pending = debounceTimers.current[setLogId]
+    if (!pending) return
+    clearTimeout(pending.timerId)
+    debounceTimers.current[setLogId] = null
+    saveSetLog(week, setLogId)
+  }
+
+  useEffect(() => {
+    function flushAllPending() {
+      for (const setLogId of Object.keys(debounceTimers.current)) {
+        const pending = debounceTimers.current[setLogId]
+        if (pending) {
+          clearTimeout(pending.timerId)
+          saveSetLog(pending.week, setLogId)
+          debounceTimers.current[setLogId] = null
+        }
+      }
+    }
+    function handleVisibility() {
+      if (document.visibilityState === 'hidden') flushAllPending()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('pagehide', flushAllPending)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('pagehide', flushAllPending)
+    }
+  }, [])
 
   async function handleClear(week, setLogId) {
     const updated = {
@@ -554,6 +597,7 @@ export default function GymDayPage() {
           inputValues={inputValues[1]}
           onChange={(id, field, val) => handleChange(1, id, field, val)}
           onClear={id => handleClear(1, id)}
+          onBlurFlush={id => flushChange(1, id)}
           onStart={() => handleStart(1)}
           onToggleComplete={() => handleToggleComplete(1)}
           starting={starting[1]}
@@ -568,6 +612,7 @@ export default function GymDayPage() {
           inputValues={inputValues[2]}
           onChange={(id, field, val) => handleChange(2, id, field, val)}
           onClear={id => handleClear(2, id)}
+          onBlurFlush={id => flushChange(2, id)}
           onStart={() => handleStart(2)}
           onToggleComplete={() => handleToggleComplete(2)}
           starting={starting[2]}

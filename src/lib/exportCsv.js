@@ -1,4 +1,5 @@
 import { GYM_PLAN } from '../data/gymPlan'
+import { toLocalDateKey } from './cohortClock'
 
 // Escape a CSV cell value
 function esc(val) {
@@ -29,7 +30,7 @@ function totalVol(setLogs) {
 
 export async function generateAndDownloadCsv(session, profile, supabase) {
   const uid = session.user.id
-  const today = new Date().toISOString().split('T')[0]
+  const today = toLocalDateKey(new Date())
   const safeName = (profile?.name || 'User').replace(/\s+/g, '_')
   const filename = `LFG14_${safeName}_${today}.csv`
 

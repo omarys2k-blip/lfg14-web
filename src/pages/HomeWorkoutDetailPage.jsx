@@ -4,6 +4,7 @@ import { ArrowLeft, Flame, Zap, Target, Wind, CheckCircle2, Undo2 } from 'lucide
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { HOME_WORKOUTS } from '../data/homeWorkoutPlan'
+import { toLocalDateKey } from '../lib/cohortClock'
 
 const GLASS = 'bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl'
 const PURPLE = '#9333ea'
@@ -52,7 +53,24 @@ export default function HomeWorkoutDetailPage() {
   async function handleMarkDone(week) {
     if (!session || !workout || saving[week]) return
     setSaving(prev => ({ ...prev, [week]: true }))
-    const today = new Date().toISOString().split('T')[0]
+
+    // Guard against duplicate sessions — same fix as the gym duplicate bug.
+    const { data: existing } = await supabase
+      .from('home_sessions')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('workout_label', workout.title)
+      .eq('week', week)
+      .limit(1)
+      .maybeSingle()
+
+    if (existing) {
+      setSessions(prev => ({ ...prev, [week]: existing }))
+      setSaving(prev => ({ ...prev, [week]: false }))
+      return
+    }
+
+    const today = toLocalDateKey(new Date())
     const { data, error } = await supabase
       .from('home_sessions')
       .insert({ user_id: session.user.id, date: today, workout_label: workout.title, week, completed: true })

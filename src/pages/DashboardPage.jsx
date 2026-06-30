@@ -8,13 +8,11 @@ import EntryModal from '../components/EntryModal'
 import PersonalizeModal from '../components/PersonalizeModal'
 import LogoutModal from '../components/LogoutModal'
 import {
-  getCohortDay, getCohortWeek,
+  useCohortDay, getCohortWeek,
   getDayDateKey, getDayShort, getDayLetter, getDayFull,
 } from '../lib/cohortClock'
 
 const GLASS = 'bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4'
-const currentDay = getCohortDay()
-const currentWeek = getCohortWeek(currentDay)
 
 // Build a map of dateKey -> { gym: bool, home: bool } from session arrays
 function buildWorkoutMap(gymSessions, homeSessions) {
@@ -48,7 +46,7 @@ function avg(values) {
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
-function Header({ profile, onPersonalize, onLogout }) {
+function Header({ profile, onPersonalize, onLogout, currentDay, currentWeek }) {
   const hasStarted = currentDay != null
   const dayName = hasStarted ? getDayFull(currentDay) : null
   const weekNum = hasStarted ? currentWeek : null
@@ -131,7 +129,7 @@ function Header({ profile, onPersonalize, onLogout }) {
 }
 
 // ── Workouts This Week ────────────────────────────────────────────────────────
-function WorkoutsCard({ gymSessions, homeSessions }) {
+function WorkoutsCard({ gymSessions, homeSessions, currentWeek }) {
   const week = currentWeek || 1
   const gymThisWeek = gymSessions.filter(s => s.week === week && s.completed)
   const homeThisWeek = homeSessions.filter(s => s.week === week && s.completed)
@@ -202,7 +200,7 @@ function WorkoutsCard({ gymSessions, homeSessions }) {
 }
 
 // ── 14-Day Calendar ───────────────────────────────────────────────────────────
-function CalendarCard({ gymSessions, homeSessions }) {
+function CalendarCard({ gymSessions, homeSessions, currentDay }) {
   const workoutMap = buildWorkoutMap(gymSessions, homeSessions)
 
   function DayCell({ dayIndex }) {
@@ -268,7 +266,7 @@ function CalendarCard({ gymSessions, homeSessions }) {
 }
 
 // ── Weight Card ───────────────────────────────────────────────────────────────
-function WeightCard({ weightEntries, onOpenModal, onDelete }) {
+function WeightCard({ weightEntries, onOpenModal, onDelete, currentDay }) {
   const entryMap = buildEntryMap(weightEntries)
 
   // Chart data: 14 days
@@ -404,7 +402,7 @@ function WeightCard({ weightEntries, onOpenModal, onDelete }) {
 }
 
 // ── Steps Card ────────────────────────────────────────────────────────────────
-function StepsCard({ stepEntries, onOpenModal, onDelete }) {
+function StepsCard({ stepEntries, onOpenModal, onDelete, currentDay }) {
   const entryMap = buildEntryMap(stepEntries)
 
   const w1vals = [1,2,3,4,5,6,7].map(d => entryMap[getDayDateKey(d)]?.steps ?? null)
@@ -528,6 +526,8 @@ function ExportCard({ session, profile }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { session, profile, fetchProfile, logout } = useAuth()
+  const currentDay = useCohortDay()
+  const currentWeek = getCohortWeek(currentDay)
   const [gymSessions, setGymSessions]     = useState([])
   const [homeSessions, setHomeSessions]   = useState([])
   const [weightEntries, setWeightEntries] = useState([])
@@ -605,20 +605,24 @@ export default function DashboardPage() {
         profile={profile}
         onPersonalize={() => setShowPersonalize(true)}
         onLogout={() => setShowLogout(true)}
+        currentDay={currentDay}
+        currentWeek={currentWeek}
       />
 
       <div className="flex flex-col gap-4 px-4 pb-8">
-        <WorkoutsCard gymSessions={gymSessions} homeSessions={homeSessions} />
-        <CalendarCard gymSessions={gymSessions} homeSessions={homeSessions} />
+        <WorkoutsCard gymSessions={gymSessions} homeSessions={homeSessions} currentWeek={currentWeek} />
+        <CalendarCard gymSessions={gymSessions} homeSessions={homeSessions} currentDay={currentDay} />
         <WeightCard
           weightEntries={weightEntries}
           onOpenModal={openModal}
           onDelete={handleDelete}
+          currentDay={currentDay}
         />
         <StepsCard
           stepEntries={stepEntries}
           onOpenModal={openModal}
           onDelete={handleDelete}
+          currentDay={currentDay}
         />
         <ExportCard session={session} profile={profile} />
       </div>
