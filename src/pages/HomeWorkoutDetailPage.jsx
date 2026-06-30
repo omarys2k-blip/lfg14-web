@@ -50,24 +50,34 @@ export default function HomeWorkoutDetailPage() {
   useEffect(() => { loadData() }, [loadData])
 
   async function handleMarkDone(week) {
-    if (!session || !workout) return
+    if (!session || !workout || saving[week]) return
     setSaving(prev => ({ ...prev, [week]: true }))
     const today = new Date().toISOString().split('T')[0]
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('home_sessions')
       .insert({ user_id: session.user.id, date: today, workout_label: workout.title, week, completed: true })
       .select()
       .single()
-    setSessions(prev => ({ ...prev, [week]: data }))
+
+    if (error || !data) {
+      console.error('Failed to save home workout completion', error)
+    } else {
+      setSessions(prev => ({ ...prev, [week]: data }))
+    }
     setSaving(prev => ({ ...prev, [week]: false }))
   }
 
   async function handleUndo(week) {
     const sess = sessions[week]
-    if (!sess) return
+    if (!sess || saving[week]) return
     setSaving(prev => ({ ...prev, [week]: true }))
-    await supabase.from('home_sessions').delete().eq('id', sess.id)
-    setSessions(prev => ({ ...prev, [week]: null }))
+    const { error } = await supabase.from('home_sessions').delete().eq('id', sess.id)
+
+    if (error) {
+      console.error('Failed to undo home workout completion', error)
+    } else {
+      setSessions(prev => ({ ...prev, [week]: null }))
+    }
     setSaving(prev => ({ ...prev, [week]: false }))
   }
 

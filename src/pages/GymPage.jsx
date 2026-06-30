@@ -22,7 +22,10 @@ export default function GymPage() {
   }, [session])
 
   function getWeekSession(dayIndex, week) {
-    return gymSessions.find(s => s.gym_day_index === dayIndex && s.week === week)
+    const matches = gymSessions.filter(s => s.gym_day_index === dayIndex && s.week === week)
+    // If duplicates ever exist, prefer a completed one so the badge never
+    // under-reports progress the user has actually logged.
+    return matches.find(s => s.completed) || matches[0]
   }
 
   return (

@@ -254,7 +254,7 @@ function ProgressReview({ w1Logs, w1Inputs, w2Logs, w2Inputs }) {
 }
 
 // ── Week Block ────────────────────────────────────────────────────────────────
-function WeekBlock({ week, session, exerciseLogs, inputValues, onChange, onClear, onStart, onToggleComplete, starting, w1Logs, w1Inputs, planExercises }) {
+function WeekBlock({ week, session, exerciseLogs, inputValues, onChange, onClear, onStart, onToggleComplete, starting, togglingComplete, w1Logs, w1Inputs, planExercises }) {
   const started = !!session
   const completed = session?.completed ?? false
   const [expanded, setExpanded] = useState(true)
@@ -268,14 +268,15 @@ function WeekBlock({ week, session, exerciseLogs, inputValues, onChange, onClear
           {started && (
             <button
               onClick={onToggleComplete}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              disabled={togglingComplete}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
               style={completed
                 ? { background: 'rgba(153,153,102,0.2)', color: '#999966', border: '1px solid rgba(153,153,102,0.4)' }
                 : { background: 'rgba(255,255,255,0.06)', color: '#9C9C9C', border: '1px solid rgba(255,255,255,0.1)' }
               }
             >
               <CheckCircle2 size={13} />
-              {completed ? '✓ Complete' : 'Mark Complete'}
+              {togglingComplete ? 'Saving…' : completed ? '✓ Complete' : 'Mark Complete'}
             </button>
           )}
           {started && (
@@ -365,6 +366,7 @@ export default function GymDayPage() {
   const [inputValues, setInputValues] = useState({ 1: {}, 2: {} })
   const [loading, setLoading] = useState(true)
   const [starting, setStarting] = useState({ 1: false, 2: false })
+  const [togglingComplete, setTogglingComplete] = useState({ 1: false, 2: false })
 
   const inputValuesRef = useRef({ 1: {}, 2: {} })
   const debounceTimers = useRef({})
@@ -419,6 +421,24 @@ export default function GymDayPage() {
     const uid = session.user.id
     const today = new Date().toISOString().split('T')[0]
 
+    // Guard against duplicate sessions: check if one already exists for this
+    // user + day + week before creating a new one (handles double-taps,
+    // re-navigation, or any race that could otherwise insert a second row).
+    const { data: existing } = await supabase
+      .from('gym_sessions')
+      .select('*')
+      .eq('user_id', uid)
+      .eq('gym_day_index', dayIndex)
+      .eq('week', week)
+      .limit(1)
+      .maybeSingle()
+
+    if (existing) {
+      await loadData()
+      setStarting(prev => ({ ...prev, [week]: false }))
+      return
+    }
+
     const { data: gymSess } = await supabase
       .from('gym_sessions')
       .insert({ user_id: uid, date: today, day_label: plan.label, gym_day_index: dayIndex, week, completed: false })
@@ -446,10 +466,27 @@ export default function GymDayPage() {
 
   async function handleToggleComplete(week) {
     const sess = sessions[week]
-    if (!sess) return
+    if (!sess || togglingComplete[week]) return // guard against double-tap
+
+    setTogglingComplete(prev => ({ ...prev, [week]: true }))
     const newVal = !sess.completed
-    await supabase.from('gym_sessions').update({ completed: newVal }).eq('id', sess.id)
-    setSessions(prev => ({ ...prev, [week]: { ...sess, completed: newVal } }))
+
+    // Wait for Supabase to confirm the write, and use the row it actually
+    // saved — never optimistically assume success. Prevents the screen from
+    // showing "Complete" when the database wasn't actually updated.
+    const { data, error } = await supabase
+      .from('gym_sessions')
+      .update({ completed: newVal })
+      .eq('id', sess.id)
+      .select()
+      .single()
+
+    if (error || !data) {
+      console.error('Failed to update completion status', error)
+    } else {
+      setSessions(prev => ({ ...prev, [week]: data }))
+    }
+    setTogglingComplete(prev => ({ ...prev, [week]: false }))
   }
 
   function handleChange(week, setLogId, field, rawValue) {
@@ -520,6 +557,7 @@ export default function GymDayPage() {
           onStart={() => handleStart(1)}
           onToggleComplete={() => handleToggleComplete(1)}
           starting={starting[1]}
+          togglingComplete={togglingComplete[1]}
           planExercises={plan.exercises}
         />
 
@@ -533,6 +571,7 @@ export default function GymDayPage() {
           onStart={() => handleStart(2)}
           onToggleComplete={() => handleToggleComplete(2)}
           starting={starting[2]}
+          togglingComplete={togglingComplete[2]}
           w1Logs={exerciseLogs[1]}
           w1Inputs={inputValues[1]}
           planExercises={plan.exercises}

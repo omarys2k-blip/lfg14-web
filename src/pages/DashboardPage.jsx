@@ -136,12 +136,17 @@ function WorkoutsCard({ gymSessions, homeSessions }) {
   const gymThisWeek = gymSessions.filter(s => s.week === week && s.completed)
   const homeThisWeek = homeSessions.filter(s => s.week === week && s.completed)
 
-  // 4 gym slots (gym_day_index 1-4); fill by index
-  const gymByIndex = {}
-  for (const s of gymThisWeek) gymByIndex[s.gym_day_index] = true
-
   const totalDone = gymThisWeek.length + homeThisWeek.length
   const totalSlots = 4
+  const overachieved = totalDone > totalSlots
+
+  // Build a combined, date-ordered list of completions so the 4 visible
+  // segments are colored by what was actually logged — green for gym,
+  // purple for home (matching the Home Workout tab's accent colour).
+  const combined = [
+    ...gymThisWeek.map(s => ({ type: 'gym', date: s.date })),
+    ...homeThisWeek.map(s => ({ type: 'home', date: s.date })),
+  ].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
 
   const motivations = [
     'Keep pushing — every rep counts.',
@@ -149,7 +154,9 @@ function WorkoutsCard({ gymSessions, homeSessions }) {
     'Show up. Every. Single. Day.',
     'Beast mode activated.',
   ]
-  const sub = motivations[Math.min(totalDone, motivations.length - 1)]
+  const sub = overachieved
+    ? "You've overachieved! 🔥"
+    : motivations[Math.min(totalDone, motivations.length - 1)]
 
   return (
     <div className={GLASS}>
@@ -160,18 +167,33 @@ function WorkoutsCard({ gymSessions, homeSessions }) {
         </span>
       </div>
 
-      {/* Four-segment bar */}
+      {/* Four-segment bar — coloured by what filled it */}
       <div className="flex gap-1.5 mb-3">
-        {[1, 2, 3, 4].map(i => {
-          const filled = i <= totalDone
+        {[0, 1, 2, 3].map(i => {
+          const entry = combined[i]
+          const color = entry
+            ? (entry.type === 'gym' ? '#999966' : '#9333ea')
+            : 'rgba(255,255,255,0.1)'
           return (
             <div
               key={i}
               className="flex-1 h-2 rounded-full transition-all"
-              style={{ background: filled ? '#999966' : 'rgba(255,255,255,0.1)' }}
+              style={{ background: color }}
             />
           )
         })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full" style={{ background: '#999966' }} />
+          <span className="text-[#9C9C9C] text-[10px]">Gym</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full" style={{ background: '#9333ea' }} />
+          <span className="text-[#9C9C9C] text-[10px]">Home</span>
+        </div>
       </div>
 
       <p className="text-[#9C9C9C] text-xs">{sub}</p>
